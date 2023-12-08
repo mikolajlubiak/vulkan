@@ -104,8 +104,9 @@ private:
         glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
         std::cout << "glfw needed extensions:" << std::endl;
-        std::cout << '\t' << *glfwExtensions << std::endl;
-
+        for (uint32_t i = 0; i < glfwExtensionCount; i++) {
+            std::cout << '\t' << glfwExtensions[i] << std::endl;
+        }
 
         bool allNeededGlfwExtensionsSupported = true;
         for (uint32_t i = 0; i < glfwExtensionCount; i++) {
