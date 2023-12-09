@@ -105,7 +105,7 @@ private:
         }
 
         if (!allNeededGlfwExtensionsSupported) {
-            throw std::runtime_error("not all needed glfw extensions aresupported");
+            throw std::runtime_error("not all needed glfw extensions are supported");
         }
 
         createInfo.enabledExtensionCount = glfwExtensionCount;
