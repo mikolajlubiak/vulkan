@@ -123,31 +123,29 @@ private:
         std::vector<VkExtensionProperties> supportedExtensions(supportedExtensionCount);
         vkEnumerateInstanceExtensionProperties(nullptr, &supportedExtensionCount, supportedExtensions.data());
 
+        std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
 
-        bool allNeededGlfwExtensionsSupported = true;
-        for (uint32_t i = 0; i < glfwExtensionCount; i++) {
+        if (enableValidationLayers) {
+            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        }
+
+        bool allNeededExtensionsSupported = true;
+        for (const char* extensionName : extensions) {
             bool isExtensionSupported = false;
             for (const auto& supportedExtension : supportedExtensions) {
-                if (strcmp(glfwExtensions[i], supportedExtension.extensionName) == 0) {
+                if (strcmp(extensionName, supportedExtension.extensionName) == 0) {
                     isExtensionSupported = true;
                     break;
                 }
             }
             if (!isExtensionSupported) {
-                allNeededGlfwExtensionsSupported = false;
+                allNeededExtensionsSupported = false;
                 break;
             }
         }
 
-        if (!allNeededGlfwExtensionsSupported) {
-            throw std::runtime_error("not all needed glfw extensions are supported");
-        }
-
-
-        std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
-
-        if (enableValidationLayers) {
-            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        if (!allNeededExtensionsSupported) {
+            throw std::runtime_error("not all needed extensions are supported");
         }
 
         return extensions;
