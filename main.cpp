@@ -64,52 +64,14 @@ private:
         appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
         appInfo.apiVersion = VK_API_VERSION_1_0;
 
-        uint32_t supportedExtensionCount = 0;
-        vkEnumerateInstanceExtensionProperties(nullptr, &supportedExtensionCount, nullptr);
-
-        std::vector<VkExtensionProperties> supportedExtensions(supportedExtensionCount);
-        vkEnumerateInstanceExtensionProperties(nullptr, &supportedExtensionCount, supportedExtensions.data());
-
-        std::cout << "available extensions:" << std::endl;
-        for (const auto& supportedExtension : supportedExtensions) {
-            std::cout << '\t' << supportedExtension.extensionName << std::endl;
-        }
-
         VkInstanceCreateInfo createInfo{};
         createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
         createInfo.pApplicationInfo = &appInfo;
 
-        uint32_t glfwExtensionCount = 0;
-        const char** glfwExtensions;
+        std::vector<const char*> extensions = getRequiredExtensions();
 
-        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-        std::cout << "glfw needed extensions:" << std::endl;
-        for (uint32_t i = 0; i < glfwExtensionCount; i++) {
-            std::cout << '\t' << glfwExtensions[i] << std::endl;
-        }
-
-        bool allNeededGlfwExtensionsSupported = true;
-        for (uint32_t i = 0; i < glfwExtensionCount; i++) {
-            bool isExtensionSupported = false;
-            for (const auto& supportedExtension : supportedExtensions) {
-                if (strcmp(glfwExtensions[i], supportedExtension.extensionName) == 0) {
-                    isExtensionSupported = true;
-                    break;
-                }
-            }
-            if (!isExtensionSupported) {
-                allNeededGlfwExtensionsSupported = false;
-                break;
-            }
-        }
-
-        if (!allNeededGlfwExtensionsSupported) {
-            throw std::runtime_error("not all needed glfw extensions are supported");
-        }
-
-        createInfo.enabledExtensionCount = glfwExtensionCount;
-        createInfo.ppEnabledExtensionNames = glfwExtensions;
+        createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+        createInfo.ppEnabledExtensionNames = extensions.data();
 
         if (enableValidationLayers && !checkValidationLayerSupport()) {
             throw std::runtime_error("not all requested validation layers are available");
@@ -148,6 +110,47 @@ private:
             }
         }
         return true;
+    }
+
+    std::vector<const char*> getRequiredExtensions() {
+        uint32_t glfwExtensionCount = 0;
+        const char** glfwExtensions;
+        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+
+        uint32_t supportedExtensionCount = 0;
+        vkEnumerateInstanceExtensionProperties(nullptr, &supportedExtensionCount, nullptr);
+
+        std::vector<VkExtensionProperties> supportedExtensions(supportedExtensionCount);
+        vkEnumerateInstanceExtensionProperties(nullptr, &supportedExtensionCount, supportedExtensions.data());
+
+
+        bool allNeededGlfwExtensionsSupported = true;
+        for (uint32_t i = 0; i < glfwExtensionCount; i++) {
+            bool isExtensionSupported = false;
+            for (const auto& supportedExtension : supportedExtensions) {
+                if (strcmp(glfwExtensions[i], supportedExtension.extensionName) == 0) {
+                    isExtensionSupported = true;
+                    break;
+                }
+            }
+            if (!isExtensionSupported) {
+                allNeededGlfwExtensionsSupported = false;
+                break;
+            }
+        }
+
+        if (!allNeededGlfwExtensionsSupported) {
+            throw std::runtime_error("not all needed glfw extensions are supported");
+        }
+
+
+        std::vector<const char*> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+
+        if (enableValidationLayers) {
+            extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+        }
+
+        return extensions;
     }
 
     GLFWwindow* window;
