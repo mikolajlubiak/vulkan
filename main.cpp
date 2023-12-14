@@ -4,11 +4,16 @@
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/hash.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
+
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
 
 #include <chrono>
 #include <iostream>
@@ -22,6 +27,7 @@
 #include <algorithm> // Necessary for std::clamp
 #include <fstream>
 #include <array>
+#include <unordered_map>
 
 #ifndef NOMINMAX
 #define NOMINMAX
@@ -34,6 +40,9 @@ const uint32_t HEIGHT = 600;
 
 const int MAX_FRAMES_IN_FLIGHT = 2;
 
+const std::string MODEL_PATH = "models/viking_room.obj";
+const std::string TEXTURE_PATH = "textures/viking_room.png";
+
 const HANDLE hConsole = GetStdHandle(STD_ERROR_HANDLE);
 
 #ifdef NDEBUG
@@ -41,6 +50,78 @@ const bool enableValidationLayers = false;
 #else
 const bool enableValidationLayers = true;
 #endif
+
+struct SwapChainSupportDetails {
+	VkSurfaceCapabilitiesKHR capabilities;
+	std::vector<VkSurfaceFormatKHR> formats;
+	std::vector<VkPresentModeKHR> presentModes;
+};
+
+struct QueueFamilyIndices {
+	std::optional<uint32_t> graphicsFamily;
+	std::optional<uint32_t> presentFamily;
+	std::optional<uint32_t> transferFamily;
+
+	bool isComplete() {
+		return graphicsFamily.has_value() && presentFamily.has_value() && transferFamily.has_value();
+	}
+};
+
+struct UniformBufferObject {
+	alignas(16) glm::mat4 model;
+	alignas(16) glm::mat4 view;
+	alignas(16) glm::mat4 proj;
+};
+
+struct Vertex {
+	glm::vec3 pos;
+	glm::vec3 color;
+	glm::vec2 texCoord;
+
+	static VkVertexInputBindingDescription getBindingDescription() {
+		VkVertexInputBindingDescription bindingDescription{};
+		bindingDescription.binding = 0;
+		bindingDescription.stride = sizeof(Vertex);
+		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+		return bindingDescription;
+	}
+
+	static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
+		std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+
+		attributeDescriptions[0].binding = 0;
+		attributeDescriptions[0].location = 0;
+		attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[0].offset = offsetof(Vertex, pos);
+
+		attributeDescriptions[1].binding = 0;
+		attributeDescriptions[1].location = 1;
+		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[1].offset = offsetof(Vertex, color);
+
+		attributeDescriptions[2].binding = 0;
+		attributeDescriptions[2].location = 2;
+		attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+
+		return attributeDescriptions;
+	}
+
+	bool operator==(const Vertex& other) const {
+		return pos == other.pos && color == other.color && texCoord == other.texCoord;
+	}
+};
+
+namespace std {
+	template<> struct hash<Vertex> {
+		size_t operator()(Vertex const& vertex) const {
+			return ((hash<glm::vec3>()(vertex.pos) ^
+				(hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
+				(hash<glm::vec2>()(vertex.texCoord) << 1);
+		}
+	};
+}
 
 VkResult CreateDebugUtilsMessengerEXT(VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDebugUtilsMessengerEXT* pDebugMessenger) {
 	PFN_vkCreateDebugUtilsMessengerEXT func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkCreateDebugUtilsMessengerEXT");
@@ -119,6 +200,7 @@ private:
 		createTextureImage();
 		createTextureImageView();
 		createTextureSampler();
+		loadModel();
 		createVertexBuffer();
 		createIndexBuffer();
 		createUniformBuffers();
@@ -404,16 +486,6 @@ private:
 		return indices.isComplete() && extensionsSupported && swapChainAdequate && allFeaturesSupported;
 	}
 
-	struct QueueFamilyIndices {
-		std::optional<uint32_t> graphicsFamily;
-		std::optional<uint32_t> presentFamily;
-		std::optional<uint32_t> transferFamily;
-
-		bool isComplete() {
-			return graphicsFamily.has_value() && presentFamily.has_value() && transferFamily.has_value();
-		}
-	};
-
 	QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) {
 		QueueFamilyIndices indices;
 
@@ -528,12 +600,6 @@ private:
 
 		return requiredExtensions.empty();
 	}
-
-	struct SwapChainSupportDetails {
-		VkSurfaceCapabilitiesKHR capabilities;
-		std::vector<VkSurfaceFormatKHR> formats;
-		std::vector<VkPresentModeKHR> presentModes;
-	};
 
 	SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device) {
 		SwapChainSupportDetails details;
@@ -984,7 +1050,7 @@ private:
 		VkDeviceSize offsets[] = { 0 };
 		vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
-		vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+		vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
 		VkViewport viewport{};
 		viewport.x = 0.0f;
@@ -1273,11 +1339,11 @@ private:
 
 		UniformBufferObject ubo{};
 
-		ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 1.0f));
+		ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
-		ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+		ubo.view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 
-		ubo.proj = glm::perspective(glm::radians(16.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
+		ubo.proj = glm::perspective(glm::radians(45.0f), swapChainExtent.width / (float)swapChainExtent.height, 0.1f, 10.0f);
 		ubo.proj[1][1] *= -1;
 
 		memcpy(uniformBuffersMapped[currentImage], &ubo, sizeof(ubo));
@@ -1349,7 +1415,7 @@ private:
 
 	void createTextureImage() {
 		int texWidth, texHeight, texChannels;
-		stbi_uc* pixels = stbi_load("textures/texture.jpg", &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+		stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
 		VkDeviceSize imageSize = texWidth * texHeight * 4;
 
 		if (!pixels) {
@@ -1642,47 +1708,44 @@ private:
 		return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
 	}
 
-	struct Vertex {
-		glm::vec3 pos;
-		glm::vec3 color;
-		glm::vec2 texCoord;
+	void loadModel() {
+		tinyobj::attrib_t attrib;
+		std::vector<tinyobj::shape_t> shapes;
+		std::vector<tinyobj::material_t> materials;
+		std::string warn, err;
 
-		static VkVertexInputBindingDescription getBindingDescription() {
-			VkVertexInputBindingDescription bindingDescription{};
-			bindingDescription.binding = 0;
-			bindingDescription.stride = sizeof(Vertex);
-			bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-			return bindingDescription;
+		if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str())) {
+			throw std::runtime_error(warn + err);
 		}
 
-		static std::array<VkVertexInputAttributeDescription, 3> getAttributeDescriptions() {
-			std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+		std::unordered_map<Vertex, uint32_t> uniqueVertices{};
 
-			attributeDescriptions[0].binding = 0;
-			attributeDescriptions[0].location = 0;
-			attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-			attributeDescriptions[0].offset = offsetof(Vertex, pos);
+		for (const tinyobj::shape_t& shape : shapes) {
+			for (const tinyobj::index_t& index : shape.mesh.indices) {
+				Vertex vertex{};
 
-			attributeDescriptions[1].binding = 0;
-			attributeDescriptions[1].location = 1;
-			attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-			attributeDescriptions[1].offset = offsetof(Vertex, color);
+				vertex.pos = {
+					attrib.vertices[3 * index.vertex_index + 0],
+					attrib.vertices[3 * index.vertex_index + 1],
+					attrib.vertices[3 * index.vertex_index + 2]
+				};
 
-			attributeDescriptions[2].binding = 0;
-			attributeDescriptions[2].location = 2;
-			attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
-			attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+				vertex.texCoord = {
+					attrib.texcoords[2 * index.texcoord_index + 0],
+					1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+				};
 
-			return attributeDescriptions;
+				vertex.color = { 1.0f, 1.0f, 1.0f };
+
+				if (uniqueVertices.count(vertex) == 0) {
+					uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+					vertices.push_back(vertex);
+				}
+
+				indices.push_back(uniqueVertices[vertex]);
+			}
 		}
-	};
-
-	struct UniformBufferObject {
-		alignas(16) glm::mat4 model;
-		alignas(16) glm::mat4 view;
-		alignas(16) glm::mat4 proj;
-	};
+	}
 
 	const std::vector<const char*> validationLayers = {
 		"VK_LAYER_KHRONOS_validation",
@@ -1692,23 +1755,6 @@ private:
 		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME,
 		VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME
-	};
-
-	const std::vector<Vertex> vertices = {
-		{{-0.5f, -0.5f, 0.0f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-		{{0.5f, -0.5f, 0.0f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-		{{0.5f, 0.5f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-		{{-0.5f, 0.5f, 0.0f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}},
-
-		{{-0.5f, -0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f}},
-		{{0.5f, -0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}},
-		{{0.5f, 0.5f, -0.5f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f}},
-		{{-0.5f, 0.5f, -0.5f}, {1.0f, 1.0f, 1.0f}, {0.0f, 1.0f}}
-	};
-
-	const std::vector<uint16_t> indices = {
-		0, 1, 2, 2, 3, 0,
-		4, 5, 6, 6, 7, 4
 	};
 
 	GLFWwindow* window;
@@ -1754,6 +1800,8 @@ private:
 	VkImage depthImage;
 	VkDeviceMemory depthImageMemory;
 	VkImageView depthImageView;
+	std::vector<Vertex> vertices;
+	std::vector<uint32_t> indices;
 };
 
 int main() {
