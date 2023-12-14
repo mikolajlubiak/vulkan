@@ -387,13 +387,17 @@ private:
 
 		bool extensionsSupported = checkDeviceExtensionSupport(device);
 
-		VkPhysicalDeviceFeatures supportedFeatures;
-		vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
+		VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
+		deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT pageableDeviceLocalMemoryFeatures = {};
+		pageableDeviceLocalMemoryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PAGEABLE_DEVICE_LOCAL_MEMORY_FEATURES_EXT;
+		deviceFeatures2.pNext = &pageableDeviceLocalMemoryFeatures;
+		vkGetPhysicalDeviceFeatures2(device, &deviceFeatures2);
 
 		SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device);
 		bool swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
 
-		bool allFeaturesSupported = supportedFeatures.samplerAnisotropy;
+		bool allFeaturesSupported = deviceFeatures2.features.samplerAnisotropy && pageableDeviceLocalMemoryFeatures.pageableDeviceLocalMemory;
 
 		return indices.isComplete() && extensionsSupported && swapChainAdequate && allFeaturesSupported;
 	}
@@ -472,7 +476,16 @@ private:
 		createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
 		createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
-		createInfo.pEnabledFeatures = &deviceFeatures;
+		VkPhysicalDeviceFeatures2 deviceFeatures2 = {};
+		deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+		VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT pageableDeviceLocalMemoryFeatures = {};
+		pageableDeviceLocalMemoryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PAGEABLE_DEVICE_LOCAL_MEMORY_FEATURES_EXT;
+		pageableDeviceLocalMemoryFeatures.pageableDeviceLocalMemory = VK_TRUE;
+		deviceFeatures2.pNext = &pageableDeviceLocalMemoryFeatures;
+		deviceFeatures2.features = deviceFeatures;
+
+		createInfo.pEnabledFeatures = nullptr;
+		createInfo.pNext = &deviceFeatures2;
 
 		if (enableValidationLayers) {
 			createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
@@ -1581,7 +1594,9 @@ private:
 	};
 
 	const std::vector<const char*> deviceExtensions = {
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+		VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME,
+		VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME
 	};
 
 	const std::vector<Vertex> vertices = {
