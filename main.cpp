@@ -34,7 +34,7 @@
 #endif
 #include <windows.h>
 
-//#define SUPERSAMPLING // comment out if you don't want supersampling (just msaa antialiasing)
+#define SUPERSAMPLING // comment out if you don't want supersampling (just msaa antialiasing)
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
