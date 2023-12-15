@@ -34,7 +34,7 @@
 #endif
 #include <windows.h>
 
-#define SUPERSAMPLING // comment out if you don't want supersampling (just msaa antialiasing)
+//#define SUPERSAMPLING // comment out if you don't want supersampling (just msaa antialiasing)
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -819,7 +819,7 @@ private:
 		multisampling.minSampleShading = .2f;
 #endif
 #ifndef SUPERSAMPLING
-		multisampling.sampleShadingEnable = VK_TRUE;
+		multisampling.sampleShadingEnable = VK_FALSE;
 		multisampling.minSampleShading = 1.0f;
 #endif
 		multisampling.rasterizationSamples = msaaSamples;
