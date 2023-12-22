@@ -303,15 +303,16 @@ private:
     createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
     createInfo.ppEnabledExtensionNames = extensions.data();
 
+    VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
     if (enableValidationLayers) {
-      VkDebugUtilsMessengerCreateInfoEXT debugCreateInfo{};
 
       createInfo.enabledLayerCount =
           static_cast<uint32_t>(validationLayers.size());
       createInfo.ppEnabledLayerNames = validationLayers.data();
 
       populateDebugMessengerCreateInfo(debugCreateInfo);
-      createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *)&debugCreateInfo;
+      createInfo.pNext =
+          static_cast<VkDebugUtilsMessengerCreateInfoEXT *>(&debugCreateInfo);
     } else {
       createInfo.enabledLayerCount = 0;
 
@@ -332,12 +333,13 @@ private:
 
     for (const char *layerName : validationLayers) {
       bool layerFound = false;
-      for (const auto &layerProperties : availableLayers) {
-        if (strcmp(layerName, layerProperties.layerName) == 0) {
-          layerFound = true;
-          break;
-        }
+      auto found = [layerName](const VkLayerProperties &layerProperties) {
+        return strcmp(layerName, layerProperties.layerName) == 0;
+      };
+      if (std::any_of(availableLayers.begin(), availableLayers.end(), found)) {
+        layerFound = true;
       }
+
       if (!layerFound) {
         return false;
       }
@@ -369,13 +371,15 @@ private:
     bool allNeededExtensionsSupported = true;
     for (const char *extensionName : extensions) {
       bool isExtensionSupported = false;
-      for (const VkExtensionProperties &supportedExtension :
-           supportedExtensions) {
-        if (strcmp(extensionName, supportedExtension.extensionName) == 0) {
-          isExtensionSupported = true;
-          break;
-        }
+      auto supported =
+          [extensionName](const VkExtensionProperties &supportedExtension) {
+            return strcmp(extensionName, supportedExtension.extensionName) == 0;
+          };
+      if (std::any_of(supportedExtensions.begin(), supportedExtensions.end(),
+                      supported)) {
+        isExtensionSupported = true;
       }
+
       if (!isExtensionSupported) {
         allNeededExtensionsSupported = false;
         break;
@@ -683,11 +687,15 @@ private:
 
   VkSurfaceFormatKHR chooseSwapSurfaceFormat(
       const std::vector<VkSurfaceFormatKHR> &availableFormats) {
-    for (const VkSurfaceFormatKHR &availableFormat : availableFormats) {
-      if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
-          availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) {
-        return availableFormat;
-      }
+
+    auto is_best = [](const VkSurfaceFormatKHR &availableFormat) {
+      return availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB &&
+             availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
+    };
+    if (auto it = std::find_if(begin(availableFormats), end(availableFormats),
+                               is_best);
+        it != std::end(availableFormats)) {
+      return *it;
     }
 
     return availableFormats[0];
@@ -695,10 +703,15 @@ private:
 
   VkPresentModeKHR chooseSwapPresentMode(
       const std::vector<VkPresentModeKHR> &availablePresentModes) {
-    for (const VkPresentModeKHR &availablePresentMode : availablePresentModes) {
-      if (availablePresentMode == VK_PRESENT_MODE_FIFO_RELAXED_KHR) {
-        return availablePresentMode;
-      }
+
+    auto is_best = [](const VkPresentModeKHR &availablePresentMode) {
+      return availablePresentMode == VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+    };
+
+    if (auto it = std::find_if(begin(availablePresentModes),
+                               end(availablePresentModes), is_best);
+        it != std::end(availablePresentModes)) {
+      return *it;
     }
 
     return VK_PRESENT_MODE_FIFO_KHR;
@@ -1943,7 +1956,8 @@ private:
         vertex.color = {1.0f, 1.0f, 1.0f};
 
         if (uniqueVertices.count(vertex) == 0) {
-          uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+          uniqueVertices.try_emplace(vertex,
+                                     static_cast<uint32_t>(vertices.size()));
           vertices.push_back(vertex);
         }
 
@@ -2133,7 +2147,7 @@ private:
   VkImageView depthImageView;
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
-  uint32_t mipLevels;
+  uint32_t mipLevels = 0;
   VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
   VkImage colorImage;
   VkDeviceMemory colorImageMemory;
