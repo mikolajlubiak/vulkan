@@ -1,7 +1,12 @@
 CFLAGS = -std=c++17 -O2
 LDFLAGS = -lglfw -lvulkan
 
-vulkan: main.cpp shaders/*.spv
+all: shaders/*.spv vulkan
+
+release: CFLAGS += -D NDEBUG
+release: vulkan
+
+vulkan: main.cpp
 	clang++ $(CFLAGS) -o vulkan main.cpp $(LDFLAGS)
 
 shaders/*.spv: shaders/shader.*
