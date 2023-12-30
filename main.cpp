@@ -2102,7 +2102,7 @@ private:
       VK_EXT_PAGEABLE_DEVICE_LOCAL_MEMORY_EXTENSION_NAME,
       VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME};
 
-  GLFWwindow *window;
+  GLFWwindow *window {};
   VkInstance instance;
   VkDebugUtilsMessengerEXT debugMessenger;
   VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
