@@ -1,1 +1,3 @@
 vulkan
+shaders/vert.spv
+shaders/frag.spv
