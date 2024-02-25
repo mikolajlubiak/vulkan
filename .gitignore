@@ -1,3 +1,4 @@
-vulkan
+debug
+release
 shaders/vert.spv
 shaders/frag.spv
