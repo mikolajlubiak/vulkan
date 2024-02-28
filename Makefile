@@ -6,11 +6,11 @@ RELEASEFLAGS := -O3 -march=native -mtune=native
 
 all: shaders/*.spv debug
 
-debug: *.cpp
-	clang++ $(CXXFLAGS) $(DEBUGFLAGS) $(LDFLAGS) -o $@ $^
+debug: *.cpp *.hpp
+	clang++ $(CXXFLAGS) $(DEBUGFLAGS) $(LDFLAGS) -o debug *.cpp
 
-release: *.cpp
-	clang++ $(CXXFLAGS) $(RELEASEFLAGS) $(LDFLAGS) -o $@ $^
+release: *.cpp *.hpp
+	clang++ $(CXXFLAGS) $(RELEASEFLAGS) $(LDFLAGS) -o release *.cpp
 
 shaders/*.spv: shaders/shader.*
 	glslc -O shaders/shader.vert -o shaders/vert.spv
