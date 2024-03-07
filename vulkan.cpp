@@ -1252,7 +1252,6 @@ void Vulkan::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
 
 void Vulkan::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer,
                         VkDeviceSize size) {
-  VkCommandBufferAllocateInfo allocInfo{};
   VkCommandBuffer commandBuffer = beginSingleTimeCommands(transferCommandPool);
 
   VkBufferCopy copyRegion{};
