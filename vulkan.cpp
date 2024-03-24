@@ -15,9 +15,99 @@
 #include <stdexcept>
 #include <vector>
 
+VkVertexInputBindingDescription Vertex::getBindingDescription() {
+  VkVertexInputBindingDescription bindingDescription{};
+  bindingDescription.binding = 0;
+  bindingDescription.stride = sizeof(Vertex);
+  bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+  return bindingDescription;
+}
+
+std::array<VkVertexInputAttributeDescription, 3>
+Vertex::getAttributeDescriptions() {
+  std::array<VkVertexInputAttributeDescription, 3> attributeDescriptions{};
+
+  attributeDescriptions[0].binding = 0;
+  attributeDescriptions[0].location = 0;
+  attributeDescriptions[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+  attributeDescriptions[0].offset = offsetof(Vertex, pos);
+
+  attributeDescriptions[1].binding = 0;
+  attributeDescriptions[1].location = 1;
+  attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+  attributeDescriptions[1].offset = offsetof(Vertex, color);
+
+  attributeDescriptions[2].binding = 0;
+  attributeDescriptions[2].location = 2;
+  attributeDescriptions[2].format = VK_FORMAT_R32G32_SFLOAT;
+  attributeDescriptions[2].offset = offsetof(Vertex, texCoord);
+
+  return attributeDescriptions;
+}
+
+bool Vertex::operator==(const Vertex &other) const {
+  return pos == other.pos && color == other.color && texCoord == other.texCoord;
+}
+
 bool QueueFamilyIndices::isComplete() {
   return graphicsFamily.has_value() && presentFamily.has_value() &&
          transferFamily.has_value();
+}
+
+void Vulkan::framebufferResizeCallback(GLFWwindow *window, int width,
+                                       int height) {
+
+  Vulkan *app = reinterpret_cast<Vulkan *>(glfwGetWindowUserPointer(window));
+  app->framebufferResized = true;
+}
+
+VKAPI_ATTR VkBool32 VKAPI_CALL
+Vulkan::debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+                      VkDebugUtilsMessageTypeFlagsEXT messageType,
+                      const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+                      void *pUserData) {
+  const char *severity = "undefined";
+  const char *color = "";
+  switch (messageSeverity) {
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT:
+    severity = "VERBOSE";
+    break;
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
+    severity = "INFO";
+    break;
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
+    severity = "WARNING";
+    color = "\033[1;33";
+    break;
+  case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
+    severity = "ERROR";
+    color = "\033[1;31";
+    break;
+  default:
+    severity = "unknown";
+  }
+
+  const char *type = "undefined";
+  switch (messageType) {
+  case VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT:
+    type = "GENERAL";
+    break;
+  case VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT:
+    type = "VALIDATION";
+    break;
+  case VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT:
+    type = "PERFORMANCE";
+    break;
+  default:
+    type = "unknown";
+  }
+
+  std::cerr << color << '(' << severity << ", " << type << ") "
+            << "validation layer: " << pCallbackData->pMessage << "\033[0m"
+            << std::endl;
+
+  return VK_FALSE;
 }
 
 VkResult CreateDebugUtilsMessengerEXT(
