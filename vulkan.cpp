@@ -6,12 +6,14 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <vector>
 
@@ -1847,11 +1849,11 @@ void Vulkan::loadModel() {
   tinyobj::attrib_t attrib;
   std::vector<tinyobj::shape_t> shapes;
   std::vector<tinyobj::material_t> materials;
-  std::string warn, err;
+  std::string err;
 
-  if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err,
+  if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err,
                         MODEL_PATH.c_str())) {
-    throw std::runtime_error(warn + err);
+    throw std::runtime_error(err);
   }
 
   std::unordered_map<Vertex, uint32_t> uniqueVertices{};
